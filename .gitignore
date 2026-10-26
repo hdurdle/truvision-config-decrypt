@@ -1,0 +1,6 @@
+node_modules/
+# Recorder backups and decrypted output contain credentials
+configurationData*
+*.csv
+*.bin
+*.dec

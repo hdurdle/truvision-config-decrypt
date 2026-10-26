@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TruVision config decrypt</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      margin: 0 auto;
+      max-width: 60rem;
+      padding: 1.5rem 1.25rem 3rem;
+      font: 16px/1.45 system-ui, sans-serif;
+    }
+    h1 { font-size: 1.35rem; margin: 0 0 0.35rem; }
+    p { margin: 0.4rem 0; }
+    .note { color: #444; }
+    @media (prefers-color-scheme: dark) { .note { color: #bbb; } }
+    form {
+      display: grid;
+      gap: 0.75rem;
+      margin: 1.25rem 0;
+      padding: 1rem;
+      border: 1px solid #8884;
+      border-radius: 8px;
+    }
+    label { display: grid; gap: 0.25rem; font-weight: 600; }
+    input[type="password"], input[type="file"] { font: inherit; }
+    input[type="password"] { padding: 0.4rem 0.5rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    button {
+      font: inherit;
+      padding: 0.4rem 0.8rem;
+      cursor: pointer;
+    }
+    button:disabled { cursor: default; opacity: 0.55; }
+    #status { min-height: 1.45em; font-weight: 600; }
+    #status.error { color: #a40000; }
+    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+    th, td { text-align: left; padding: 0.3rem 0.5rem; border-bottom: 1px solid #8884; vertical-align: top; }
+    th { font-size: 0.85rem; }
+    td.mono, th.mono { font-family: ui-monospace, Consolas, monospace; }
+    tr.empty td { opacity: 0.55; }
+  </style>
+</head>
+<body>
+  <h1>TruVision config decrypt</h1>
+  <p class="note">Decrypts an exported <code>configurationData</code> file and lists the camera logins stored in it. The file is read and decrypted in this page. It is not uploaded.</p>
+
+  <form id="form" action="#">
+    <label>
+      Config file
+      <input id="file" type="file" required>
+    </label>
+    <label>
+      Export password
+      <input id="password" type="password" autocomplete="off" required>
+    </label>
+    <div class="actions">
+      <button id="go" type="submit">Decrypt</button>
+      <button id="csv" type="button" disabled>Download CSV</button>
+    </div>
+  </form>
+
+  <p id="status" role="status"></p>
+  <div id="out"></div>
+
+  <script src="config-decrypt.js"></script>
+  <script>
+    const form = document.getElementById('form');
+    const fileInput = document.getElementById('file');
+    const passwordInput = document.getElementById('password');
+    const go = document.getElementById('go');
+    const csvBtn = document.getElementById('csv');
+    const statusEl = document.getElementById('status');
+    const out = document.getElementById('out');
+    let csvText = '';
+
+    function setStatus(message, isError) {
+      statusEl.textContent = message;
+      statusEl.className = isError ? 'error' : '';
+    }
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const file = fileInput.files && fileInput.files[0];
+      const password = passwordInput.value;
+      if (!file || !password) return;
+
+      csvText = '';
+      csvBtn.disabled = true;
+      out.replaceChildren();
+      setStatus('Decrypting…');
+      go.disabled = true;
+
+      file.arrayBuffer().then((buf) => {
+        return TruVisionConfig.decryptExport(new Uint8Array(buf), password);
+      }).then((result) => {
+        render(result.rows);
+        const withPassword = result.rows.filter((r) => r.password).length;
+        setStatus(result.rows.length + ' channels, ' + withPassword + ' with a password. Decrypted in this browser.');
+      }).catch((err) => {
+        setStatus(err && err.message ? err.message : String(err), true);
+      }).finally(() => {
+        go.disabled = false;
+      });
+    });
+
+    function render(rows) {
+      csvText = TruVisionConfig.toCsv(rows);
+      csvBtn.disabled = false;
+      const table = document.createElement('table');
+      const head = document.createElement('thead');
+      const hr = document.createElement('tr');
+      for (const label of ['Ch', 'Name', 'IP', 'Username', 'Password']) {
+        const th = document.createElement('th');
+        th.textContent = label;
+        if (label === 'IP' || label === 'Username' || label === 'Password') th.className = 'mono';
+        hr.appendChild(th);
+      }
+      head.appendChild(hr);
+      table.appendChild(head);
+      const body = document.createElement('tbody');
+      for (const r of rows) {
+        const tr = document.createElement('tr');
+        if (!r.password) tr.className = 'empty';
+        for (const [value, mono] of [
+          [String(r.channel), false],
+          [r.name, false],
+          [r.ip, true],
+          [r.username, true],
+          [r.password, true],
+        ]) {
+          const td = document.createElement('td');
+          td.textContent = value;
+          if (mono) td.className = 'mono';
+          tr.appendChild(td);
+        }
+        body.appendChild(tr);
+      }
+      table.appendChild(body);
+      out.replaceChildren(table);
+    }
+
+    csvBtn.addEventListener('click', () => {
+      if (!csvText) return;
+      const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'truvision-cameras.csv';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+  </script>
+</body>
+</html>

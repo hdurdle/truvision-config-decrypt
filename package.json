@@ -1,0 +1,13 @@
+{
+  "name": "truvision-config-decrypt",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Decrypt a TruVision or Hikvision configurationData export and list the camera logins stored in it.",
+  "bin": {
+    "decrypt-truvision-config": "./decrypt-config.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
