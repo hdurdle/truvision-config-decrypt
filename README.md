@@ -34,7 +34,7 @@ The file is usually named `configurationData`. It is about 10 MB of ciphertext.
 From this folder, or pass a path to the script:
 
 ```powershell
-node .\TruVision\decrypt-config.mjs .\configurationData_2026 <export-password>
+node .\decrypt-config.mjs .\configurationData_2026 <export-password>
 ```
 
 `--json` and `--csv` change the output. `--decrypt-out <file>` also writes
